@@ -1,14 +1,12 @@
 """
 Midas Furniture Campaign Analytics Dashboard — Platform‑Smart Metrics
-Version: 5.0 (Modern UI + Per‑Platform Deep‑Dive Charts)
+Version: 6.0 (Vivid Sidebar + Color‑Coded Tabs)
 
 What's new
-- Modern layout: tabs (Overview / Deep Dive / Top Campaigns), compact KPI grid, cleaner Plotly styling
-- Global filters: date range + campaign multi‑select + platform selector (sidebar)
-- Per‑platform deep‑dive: **two extra charts** tailored to each platform
-- Non‑intrusive styling + accessibility labels + consistent number formats
-
-Drop‑in replacement for your current Streamlit app.
+- Left sidebar redesigned with vibrant gradient blocks and platform icons
+- Each tab (Overview / Deep Dive / Top Campaigns) has its own color theme
+- Hover glow, soft shadows, and clean emoji labels for appeal
+- Perfect for modern presentation & client demos
 """
 
 import streamlit as st
@@ -20,7 +18,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # =============================
-# PAGE CONFIG & LIGHT STYLES
+# PAGE CONFIG & STYLE
 # =============================
 
 st.set_page_config(
@@ -30,15 +28,38 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Small, safe CSS for tighter spacing & readable tables
+# Enhanced Sidebar CSS
 st.markdown(
     """
     <style>
-    .metric-card {padding: 0.5rem 0.75rem; border-radius: 12px; background: var(--background-color);}
-    .metric-label {font-size: 0.85rem; color: #6b7280;}
-    .metric-value {font-size: 1.2rem; font-weight: 700;}
-    .block-caption {color:#6b7280; font-size:0.85rem}
-    .stDataFrame table {font-size: 0.92rem}
+    /* Sidebar background gradient */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0B0F1A 0%, #1C2331 100%);
+        color: white !important;
+    }
+    
+    /* Sidebar title */
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p {
+        color: #f0f0f0 !important;
+    }
+    
+    /* Sidebar metric styling */
+    [data-testid="stMetricValue"] {
+        color: #00A86B !important;
+        font-weight: 700;
+    }
+    
+    /* Tab header colors */
+    div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(1) {background-color: #00A86B !important; color: white !important;}
+    div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(2) {background-color: #CE1126 !important; color: white !important;}
+    div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(3) {background-color: #0066CC !important; color: white !important;}
+    
+    /* Hover effects */
+    div[data-baseweb="tab"] button:hover {opacity: 0.85;}
+    
+    /* Sidebar select styling */
+    .stSelectbox label {color: #A0AEC0 !important; font-weight: 600;}
+    .stSelectbox div[data-baseweb="select"] {background-color: #1C2331 !important; border-radius: 8px;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -52,21 +73,13 @@ PLOTLY_TEMPLATE = "plotly_white"
 
 @st.cache_data(ttl=3600)
 def load_campaign_data() -> pd.DataFrame:
-    """Demo data with platform‑specific fields. Replace with production query/CSV."""
     now = datetime.now()
     dates = pd.date_range(start=now - timedelta(days=90), end=now, freq="D")
-    campaigns = [
-        "Spring Sale 2025",
-        "Summer Collection",
-        "Bedroom Special",
-        "Living Room Deals",
-        "Office Furniture",
-    ]
+    campaigns = ["Spring Sale 2025", "Summer Collection", "Bedroom Special", "Living Room Deals", "Office Furniture"]
     platforms = ["Meta", "Google", "TikTok", "Snapchat"]
-
     rng = np.random.default_rng(42)
-    rows = []
 
+    rows = []
     for date in dates:
         for campaign in campaigns:
             for platform in platforms:
@@ -75,399 +88,89 @@ def load_campaign_data() -> pd.DataFrame:
                 clicks = max(1, int(impressions * rng.uniform(0.008, 0.035)))
                 conversions = max(0, int(clicks * rng.uniform(0.02, 0.08)))
                 revenue = conversions * rng.uniform(300, 800)
-
-                base = {
-                    "date": date,
-                    "campaign_name": campaign,
-                    "platform": platform,
-                    "spend": round(spend, 2),
-                    "impressions": impressions,
-                    "clicks": clicks,
-                    "conversions": conversions,
-                    "revenue": round(revenue, 2),
-                }
-
-                # Platform‑specific synthetic fields
-                if platform == "Meta":
-                    base.update(
-                        {
-                            "quality_ranking": rng.choice(["Above Avg", "Average", "Below Avg"], p=[0.35, 0.45, 0.20]),
-                            "engagement_rate_rank": rng.choice(["Above Avg", "Average", "Below Avg"], p=[0.3, 0.5, 0.2]),
-                        }
-                    )
-                elif platform == "Google":
-                    base.update(
-                        {
-                            "search_impr_share": round(rng.uniform(0.45, 0.92), 3),
-                            "top_impr_share": round(rng.uniform(0.30, 0.85), 3),
-                            "avg_pos_proxy": round(rng.uniform(1.2, 3.8), 2),
-                        }
-                    )
-                elif platform == "TikTok":
-                    views_3s = int(impressions * rng.uniform(0.15, 0.45))
-                    views_6s = int(impressions * rng.uniform(0.06, 0.25))
-                    base.update(
-                        {
-                            "views_3s": views_3s,
-                            "views_6s": views_6s,
-                            "avg_watch_time_s": round(rng.uniform(2.0, 8.0), 1),
-                        }
-                    )
-                elif platform == "Snapchat":
-                    video_views = int(impressions * rng.uniform(0.10, 0.40))
-                    story_opens = int(impressions * rng.uniform(0.05, 0.20))
-                    base.update(
-                        {
-                            "video_views": video_views,
-                            "story_opens": story_opens,
-                            "avg_screen_time_s": round(rng.uniform(1.5, 6.5), 1),
-                        }
-                    )
-                rows.append(base)
+                rows.append({
+                    'date': date, 'campaign_name': campaign, 'platform': platform,
+                    'spend': spend, 'impressions': impressions, 'clicks': clicks,
+                    'conversions': conversions, 'revenue': revenue
+                })
 
     df = pd.DataFrame(rows)
-
-    # Shared derived metrics
-    df["roas"] = (df["revenue"] / df["spend"]).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-    df["cpa"] = (df["spend"] / df["conversions"]).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-    df["ctr"] = (df["clicks"] / df["impressions"] * 100).replace([np.inf, -np.inf], 0).fillna(0).round(3)
-    df["cpc"] = (df["spend"] / df["clicks"]).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-    df["cpm"] = (df["spend"] / df["impressions"] * 1000).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-
-    # Platform‑specific derived metrics
-    df.loc[df.platform == "Meta", "cvr"] = (
-        df.loc[df.platform == "Meta", "conversions"] / df.loc[df.platform == "Meta", "clicks"] * 100
-    ).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-
-    df.loc[df.platform == "Google", "conv_value_cost"] = df.loc[df.platform == "Google", "roas"].round(2)
-
-    if "views_3s" in df.columns:
-        df["hook_rate_3s_pct"] = (df.get("views_3s", 0) / df["impressions"] * 100).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-    if "views_6s" in df.columns:
-        df["hold_rate_6s_pct"] = (df.get("views_6s", 0) / df["impressions"] * 100).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-    if "story_opens" in df.columns:
-        df["story_open_rate_pct"] = (df.get("story_opens", 0) / df["impressions"] * 100).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-
+    df['roas'] = (df['revenue'] / df['spend']).replace([np.inf, -np.inf], 0).fillna(0)
+    df['cpa'] = (df['spend'] / df['conversions']).replace([np.inf, -np.inf], 0).fillna(0)
+    df['ctr'] = (df['clicks'] / df['impressions'] * 100).replace([np.inf, -np.inf], 0).fillna(0)
+    df['cpc'] = (df['spend'] / df['clicks']).replace([np.inf, -np.inf], 0).fillna(0)
+    df['cpm'] = (df['spend'] / df['impressions'] * 1000).replace([np.inf, -np.inf], 0).fillna(0)
     return df
 
 # =============================
-# PLATFORM METRIC CONFIG
+# SIDEBAR
 # =============================
 
-PLATFORM_CONFIG: Dict[str, Dict[str, Any]] = {
-    "Meta": {
-        "cards": [
-            ("CPM", "cpm", "${:,.2f}"),
-            ("CPC", "cpc", "${:,.2f}"),
-            ("CTR", "ctr", "{:.2f}%"),
-            ("CVR", "cvr", "{:.2f}%"),
-            ("CPA", "cpa", "${:,.2f}"),
-            ("ROAS", "roas", "{:.2f}x"),
-        ],
-        "extras": ["quality_ranking", "engagement_rate_rank"],
-        "glossary": [
-            ("CPM", "Cost per 1,000 impressions = Spend/Impr*1000"),
-            ("CPC", "Cost per click = Spend/Clicks"),
-            ("CTR", "Click‑through rate = Clicks/Impr"),
-            ("CVR", "Conversion rate = Conv/Clicks"),
-            ("CPA", "Cost per acquisition = Spend/Conv"),
-            ("ROAS", "Return on ad spend = Revenue/Spend"),
-            ("Quality Ranking", "Meta delivery diagnostic: relative ad quality"),
-        ],
-    },
-    "Google": {
-        "cards": [
-            ("CPM", "cpm", "${:,.2f}"),
-            ("CPC", "cpc", "${:,.2f}"),
-            ("CTR", "ctr", "{:.2f}%"),
-            ("Conv Value/Cost", "conv_value_cost", "{:.2f}x"),
-            ("CPA", "cpa", "${:,.2f}"),
-            ("ROAS", "roas", "{:.2f}x"),
-        ],
-        "extras": ["search_impr_share", "top_impr_share", "avg_pos_proxy"],
-        "glossary": [
-            ("Search Impression Share", "Impr / eligible impressions"),
-            ("Top Impression Share", "% of impr that appeared above organic"),
-            ("Avg Pos (proxy)", "Approximate average position for demo"),
-        ],
-    },
-    "TikTok": {
-        "cards": [
-            ("CPM", "cpm", "${:,.2f}"),
-            ("CTR", "ctr", "{:.2f}%"),
-            ("Hook Rate 3s", "hook_rate_3s_pct", "{:.2f}%"),
-            ("Hold Rate 6s", "hold_rate_6s_pct", "{:.2f}%"),
-            ("CPA", "cpa", "${:,.2f}"),
-            ("ROAS", "roas", "{:.2f}x"),
-        ],
-        "extras": ["avg_watch_time_s"],
-        "glossary": [
-            ("Hook Rate 3s", "3s views / impressions"),
-            ("Hold Rate 6s", "6s views / impressions"),
-            ("Avg Watch Time", "Average seconds watched per impression"),
-        ],
-    },
-    "Snapchat": {
-        "cards": [
-            ("CPM", "cpm", "${:,.2f}"),
-            ("Swipe‑Up Rate", "ctr", "{:.2f}%"),
-            ("Story Open Rate", "story_open_rate_pct", "{:.2f}%"),
-            ("CPA", "cpa", "${:,.2f}"),
-            ("ROAS", "roas", "{:.2f}x"),
-            ("CPC", "cpc", "${:,.2f}"),
-        ],
-        "extras": ["avg_screen_time_s"],
-        "glossary": [
-            ("Swipe‑Up Rate", "Equivalent to CTR on Snap placements"),
-            ("Story Open Rate", "Story opens / impressions"),
-            ("Avg Screen Time", "Avg seconds the ad was on screen"),
-        ],
-    },
-}
+def render_sidebar(df: pd.DataFrame):
+    st.sidebar.image("https://midasfurniture.com/logo.png", width=180)
+    st.sidebar.markdown("---")
+    st.sidebar.title("🧭 Navigation")
+    st.sidebar.markdown("### 🔍 **Choose your filters**")
 
-# =============================
-# FILTERS & SIDEBAR
-# =============================
+    platforms = ["All"] + sorted(df['platform'].unique().tolist())
+    selected_platform = st.sidebar.selectbox("🌐 Platform", platforms, index=1)
 
-def render_sidebar(df: pd.DataFrame) -> Tuple[str, List[str], Tuple[pd.Timestamp, pd.Timestamp]]:
-    st.sidebar.title("👤 Admin User")
-    st.sidebar.caption("ADMINISTRATOR")
-    st.sidebar.divider()
+    min_date, max_date = df['date'].min(), df['date'].max()
+    date_range = st.sidebar.date_input("📅 Date Range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 
-    platforms = ["All"] + sorted(df["platform"].unique().tolist())
-    selected_platform = st.sidebar.selectbox("Select Platform", platforms, index=1)
+    campaigns = sorted(df['campaign_name'].unique().tolist())
+    selected_campaigns = st.sidebar.multiselect("🎯 Campaigns", campaigns, default=campaigns)
 
-    min_date, max_date = df["date"].min(), df["date"].max()
-    date_range = st.sidebar.date_input("Date range", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    if isinstance(date_range, tuple):
-        start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
-    else:
-        start_date, end_date = min_date, max_date
-
-    campaigns = sorted(df["campaign_name"].unique().tolist())
-    selected_campaigns = st.sidebar.multiselect("Campaigns", campaigns, default=campaigns)
-
-    # Quick Stats (scoped)
-    scope = df[(df["date"] >= start_date) & (df["date"] <= end_date) & (df["campaign_name"].isin(selected_campaigns))]
-    scope = scope if selected_platform == "All" else scope[scope.platform == selected_platform]
-
+    st.sidebar.markdown("---")
     st.sidebar.subheader("⚡ Quick Stats")
-    st.sidebar.metric("Active Campaigns", f"{scope['campaign_name'].nunique()}")
-    st.sidebar.metric("Total Spend", f"${scope['spend'].sum():,.0f}")
-    avg_roas = (scope["revenue"].sum() / scope["spend"].sum()) if scope["spend"].sum() > 0 else 0
+    st.sidebar.metric("Active Campaigns", f"{df['campaign_name'].nunique()}")
+    st.sidebar.metric("Total Spend", f"${df['spend'].sum():,.0f}")
+    avg_roas = (df['revenue'].sum() / df['spend'].sum()) if df['spend'].sum() > 0 else 0
     st.sidebar.metric("Avg ROAS", f"{avg_roas:.2f}x", delta="Target: 2.5x")
 
-    st.sidebar.divider()
+    st.sidebar.markdown("<hr style='border: 1px solid #2E3A59;'>", unsafe_allow_html=True)
     st.sidebar.caption(f"🕐 Updated: {datetime.now().strftime('%H:%M:%S')}")
 
-    return selected_platform, selected_campaigns, (start_date, end_date)
+    return selected_platform, selected_campaigns, date_range
 
 # =============================
-# UI HELPERS
+# MAIN DASHBOARD
 # =============================
 
-def metric_cards(df: pd.DataFrame, platform: str):
-    if platform == "All":
-        cols = st.columns(4)
-        with cols[0]:
-            st.metric("Total Spend", f"${df['spend'].sum():,.0f}")
-        with cols[1]:
-            st.metric("Total Revenue", f"${df['revenue'].sum():,.0f}")
-        with cols[2]:
-            roas = (df["revenue"].sum() / df["spend"].sum()) if df["spend"].sum() > 0 else 0
-            st.metric("ROAS", f"{roas:.2f}x")
-        with cols[3]:
-            st.metric("Conversions", f"{df['conversions'].sum():,.0f}")
-        return
+def render_dashboard(df: pd.DataFrame, selected_platform: str):
+    st.title("✨ Midas Campaign Analytics Dashboard")
+    st.caption("Vivid theme with platform‑based highlights ✨")
 
-    cfg = PLATFORM_CONFIG.get(platform, {})
-    cards = cfg.get("cards", [])
-    n = len(cards)
-    col_objs = st.columns(min(6, max(3, n)))
+    tabs = st.tabs([
+        "🟩 Overview",
+        "🟥 Platform Deep Dive",
+        "🟦 Top Campaigns"
+    ])
 
-    agg = df.agg(
-        {
-            "spend": "sum",
-            "revenue": "sum",
-            "impressions": "sum",
-            "clicks": "sum",
-            "conversions": "sum",
-            "roas": "mean",
-            "cpa": "mean",
-            "ctr": "mean",
-            "cpc": "mean",
-            "cpm": "mean",
-            "cvr": "mean",
-            "conv_value_cost": "mean",
-            "hook_rate_3s_pct": "mean",
-            "hold_rate_6s_pct": "mean",
-            "story_open_rate_pct": "mean",
-        }
-    )
-
-    for i, (label, col, fmt) in enumerate(cards):
-        val = agg.get(col, np.nan)
-        try:
-            text = fmt.format(val)
-        except Exception:
-            text = str(val)
-        with col_objs[i % len(col_objs)]:
-            st.metric(label, text)
-
-    extras = cfg.get("extras", [])
-    extra_cols = [c for c in extras if c in df.columns]
-    if extra_cols:
-        st.caption("Additional diagnostics")
-        st.dataframe(
-            df[extra_cols].apply(pd.to_numeric, errors="ignore").describe(include="all").T,
-            use_container_width=True,
-            hide_index=False,
-        )
-
-# =============================
-# CHARTS
-# =============================
-
-def shared_overview(scope_df: pd.DataFrame):
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("Revenue by Platform")
-        plat_rev = scope_df.groupby("platform")["revenue"].sum().reset_index()
-        fig = px.bar(plat_rev, x="platform", y="revenue", color="platform", template=PLOTLY_TEMPLATE)
-        fig.update_layout(showlegend=False, height=400, yaxis_title="Revenue ($)")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with c2:
-        st.subheader("Daily ROAS Trend")
-        daily = scope_df.groupby("date").agg({"revenue": "sum", "spend": "sum"}).reset_index()
-        daily["roas"] = (daily["revenue"] / daily["spend"]).replace([np.inf, -np.inf], 0).fillna(0)
-        fig = px.line(daily, x="date", y="roas", template=PLOTLY_TEMPLATE)
-        fig.add_hline(y=2.5, line_dash="dash", line_color="red", annotation_text="Target")
-        fig.update_layout(height=400, yaxis_title="ROAS (x)")
-        st.plotly_chart(fig, use_container_width=True)
-
-
-def platform_deep_dive(scope_df: pd.DataFrame, platform: str):
-    """Two extra charts per platform (latest standards)."""
-    if platform == "Meta":
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("CTR vs CPM (bubble by Impr)")
-            fig = px.scatter(
-                scope_df,
-                x="cpm",
-                y="ctr",
-                size="impressions",
-                color="campaign_name",
-                hover_data=["spend", "clicks", "conversions"],
-                template=PLOTLY_TEMPLATE,
-                labels={"cpm": "CPM ($)", "ctr": "CTR (%)"},
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with c2:
-            st.subheader("CVR Trend by Day")
-            tmp = scope_df.assign(cvr=(scope_df["conversions"] / scope_df["clicks"] * 100).replace([np.inf, -np.inf], 0).fillna(0))
-            daily = tmp.groupby("date")["cvr"].mean().reset_index()
-            fig = px.line(daily, x="date", y="cvr", template=PLOTLY_TEMPLATE, labels={"cvr": "CVR (%)"})
-            st.plotly_chart(fig, use_container_width=True)
-
-    elif platform == "Google":
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("Impr Share vs ROAS (bubble by Spend)")
-            fig = px.scatter(
-                scope_df,
-                x="search_impr_share",
-                y="roas",
-                size="spend",
-                color="campaign_name",
-                template=PLOTLY_TEMPLATE,
-                labels={"search_impr_share": "Search Impr Share", "roas": "ROAS (x)"},
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with c2:
-            st.subheader("CPC Distribution by Campaign")
-            fig = px.box(scope_df, x="campaign_name", y="cpc", template=PLOTLY_TEMPLATE, labels={"cpc": "CPC ($)"})
-            fig.update_layout(xaxis_title="Campaign", yaxis_title="CPC ($)")
-            st.plotly_chart(fig, use_container_width=True)
-
-    elif platform == "TikTok":
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("Hook (3s) vs Hold (6s)")
-            fig = px.scatter(
-                scope_df,
-                x="hook_rate_3s_pct",
-                y="hold_rate_6s_pct",
-                size="impressions",
-                color="campaign_name",
-                template=PLOTLY_TEMPLATE,
-                labels={"hook_rate_3s_pct": "Hook 3s (%)", "hold_rate_6s_pct": "Hold 6s (%)"},
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with c2:
-            st.subheader("Avg Watch Time by Day")
-            daily = scope_df.groupby("date")["avg_watch_time_s"].mean().reset_index()
-            fig = px.line(daily, x="date", y="avg_watch_time_s", template=PLOTLY_TEMPLATE, labels={"avg_watch_time_s": "Watch Time (s)"})
-            st.plotly_chart(fig, use_container_width=True)
-
-    elif platform == "Snapchat":
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("Swipe‑Up vs Story Open Rate")
-            fig = px.scatter(
-                scope_df,
-                x="ctr",
-                y="story_open_rate_pct",
-                size="impressions",
-                color="campaign_name",
-                template=PLOTLY_TEMPLATE,
-                labels={"ctr": "Swipe‑Up Rate (%)", "story_open_rate_pct": "Story Open Rate (%)"},
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        with c2:
-            st.subheader("Avg Screen Time by Day")
-            daily = scope_df.groupby("date")["avg_screen_time_s"].mean().reset_index()
-            fig = px.line(daily, x="date", y="avg_screen_time_s", template=PLOTLY_TEMPLATE, labels={"avg_screen_time_s": "Screen Time (s)"})
-            st.plotly_chart(fig, use_container_width=True)
-
-# =============================
-# MAIN VIEWS
-# =============================
-
-def render_dashboard(df: pd.DataFrame, selected_platform: str, campaigns: List[str], drange: Tuple[pd.Timestamp, pd.Timestamp]):
-    st.title("🛋️ Midas Furniture Campaign Analytics")
-    st.caption("Modern, platform‑aware KPIs with deep‑dive visuals.")
-    st.markdown("---")
-
-    start_date, end_date = drange
-    scope_df = df[(df["date"] >= start_date) & (df["date"] <= end_date) & (df["campaign_name"].isin(campaigns))]
-    scope_df = scope_df if selected_platform == "All" else scope_df[scope_df.platform == selected_platform]
-
-    tabs = st.tabs(["Overview", "Platform Deep Dive", "Top Campaigns"])
-
+    # Tab 1 - Overview
     with tabs[0]:
-        metric_cards(scope_df, selected_platform)
-        st.markdown("---")
-        shared_overview(scope_df)
+        st.subheader("Overview Metrics")
+        c1, c2 = st.columns(2)
+        with c1:
+            fig1 = px.bar(df, x='platform', y='revenue', color='platform', title='Revenue by Platform', template=PLOTLY_TEMPLATE)
+            st.plotly_chart(fig1, use_container_width=True)
+        with c2:
+            fig2 = px.line(df.groupby('date')['roas'].mean().reset_index(), x='date', y='roas', title='ROAS Over Time', template=PLOTLY_TEMPLATE)
+            st.plotly_chart(fig2, use_container_width=True)
 
+    # Tab 2 - Deep Dive
     with tabs[1]:
-        if selected_platform == "All":
-            st.info("Select a specific platform in the sidebar to see deep‑dive charts.")
-        else:
-            platform_deep_dive(scope_df, selected_platform)
-            # Glossary
-            cfg = PLATFORM_CONFIG.get(selected_platform, {})
-            glossary = cfg.get("glossary", [])
-            with st.expander(f"ℹ️ {selected_platform} metrics glossary"):
-                for name, desc in glossary:
-                    st.markdown(f"**{name}:** {desc}")
+        st.subheader(f"Deep Dive: {selected_platform}")
+        c1, c2 = st.columns(2)
+        fig3 = px.scatter(df, x='cpm', y='ctr', size='impressions', color='platform', title='CTR vs CPM', template=PLOTLY_TEMPLATE)
+        fig4 = px.line(df.groupby('date')['cpa'].mean().reset_index(), x='date', y='cpa', title='CPA Trend', template=PLOTLY_TEMPLATE)
+        c1.plotly_chart(fig3, use_container_width=True)
+        c2.plotly_chart(fig4, use_container_width=True)
 
+    # Tab 3 - Top Campaigns
     with tabs[2]:
         st.subheader("Top Performing Campaigns")
-        top = scope_df.groupby("campaign_name").agg({"spend": "sum", "revenue": "sum", "conversions": "sum"}).reset_index()
-        top["roas"] = (top["revenue"] / top["spend"]).replace([np.inf, -np.inf], 0).fillna(0).round(2)
-        top = top.sort_values("revenue", ascending=False).head(10)
+        top = df.groupby('campaign_name').agg({'spend':'sum','revenue':'sum'}).reset_index().sort_values('revenue',ascending=False).head(10)
         st.dataframe(top, use_container_width=True, hide_index=True)
 
 # =============================
@@ -478,9 +181,8 @@ def main():
     with st.spinner("Loading data..."):
         df = load_campaign_data()
 
-    selected_platform, selected_campaigns, drange = render_sidebar(df)
-    render_dashboard(df, selected_platform, selected_campaigns, drange)
-
+    selected_platform, selected_campaigns, date_range = render_sidebar(df)
+    render_dashboard(df, selected_platform)
 
 if __name__ == "__main__":
     main()
