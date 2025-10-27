@@ -1,12 +1,10 @@
 """
-Midas Furniture Campaign Analytics Dashboard — Platform‑Smart Metrics
-Version: 6.0 (Vivid Sidebar + Color‑Coded Tabs)
+Midas Furniture Campaign Analytics Dashboard — Platform-Smart Metrics
+Version: 6.1 (Streamlit 2026 Ready: Width + Config Compatibility)
 
-What's new
-- Left sidebar redesigned with vibrant gradient blocks and platform icons
-- Each tab (Overview / Deep Dive / Top Campaigns) has its own color theme
-- Hover glow, soft shadows, and clean emoji labels for appeal
-- Perfect for modern presentation & client demos
+- Updated to replace deprecated `use_container_width` with `width='stretch'`
+- All Plotly charts use the new `config` parameter instead of deprecated keyword args
+- Retains vibrant sidebar + tab color theming
 """
 
 import streamlit as st
@@ -28,44 +26,22 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Enhanced Sidebar CSS
 st.markdown(
     """
     <style>
-    /* Sidebar background gradient */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0B0F1A 0%, #1C2331 100%);
-        color: white !important;
-    }
-    
-    /* Sidebar title */
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span, [data-testid="stSidebar"] p {
-        color: #f0f0f0 !important;
-    }
-    
-    /* Sidebar metric styling */
-    [data-testid="stMetricValue"] {
-        color: #00A86B !important;
-        font-weight: 700;
-    }
-    
-    /* Tab header colors */
+    [data-testid="stSidebar"] {background: linear-gradient(180deg, #0B0F1A 0%, #1C2331 100%); color: white;}
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] span {color: #f0f0f0 !important;}
+    [data-testid="stMetricValue"] {color: #00A86B !important; font-weight: 700;}
     div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(1) {background-color: #00A86B !important; color: white !important;}
     div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(2) {background-color: #CE1126 !important; color: white !important;}
     div[data-baseweb="tab"] button[aria-selected="true"]:nth-child(3) {background-color: #0066CC !important; color: white !important;}
-    
-    /* Hover effects */
-    div[data-baseweb="tab"] button:hover {opacity: 0.85;}
-    
-    /* Sidebar select styling */
-    .stSelectbox label {color: #A0AEC0 !important; font-weight: 600;}
-    .stSelectbox div[data-baseweb="select"] {background-color: #1C2331 !important; border-radius: 8px;}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 PLOTLY_TEMPLATE = "plotly_white"
+PLOTLY_CONFIG = {"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]}
 
 # =============================
 # DATA LOADING
@@ -110,7 +86,6 @@ def render_sidebar(df: pd.DataFrame):
     st.sidebar.image("https://midasfurniture.com/logo.png", width=180)
     st.sidebar.markdown("---")
     st.sidebar.title("🧭 Navigation")
-    st.sidebar.markdown("### 🔍 **Choose your filters**")
 
     platforms = ["All"] + sorted(df['platform'].unique().tolist())
     selected_platform = st.sidebar.selectbox("🌐 Platform", platforms, index=1)
@@ -128,9 +103,7 @@ def render_sidebar(df: pd.DataFrame):
     avg_roas = (df['revenue'].sum() / df['spend'].sum()) if df['spend'].sum() > 0 else 0
     st.sidebar.metric("Avg ROAS", f"{avg_roas:.2f}x", delta="Target: 2.5x")
 
-    st.sidebar.markdown("<hr style='border: 1px solid #2E3A59;'>", unsafe_allow_html=True)
     st.sidebar.caption(f"🕐 Updated: {datetime.now().strftime('%H:%M:%S')}")
-
     return selected_platform, selected_campaigns, date_range
 
 # =============================
@@ -139,39 +112,31 @@ def render_sidebar(df: pd.DataFrame):
 
 def render_dashboard(df: pd.DataFrame, selected_platform: str):
     st.title("✨ Midas Campaign Analytics Dashboard")
-    st.caption("Vivid theme with platform‑based highlights ✨")
 
-    tabs = st.tabs([
-        "🟩 Overview",
-        "🟥 Platform Deep Dive",
-        "🟦 Top Campaigns"
-    ])
+    tabs = st.tabs(["🟩 Overview", "🟥 Platform Deep Dive", "🟦 Top Campaigns"])
 
-    # Tab 1 - Overview
     with tabs[0]:
         st.subheader("Overview Metrics")
         c1, c2 = st.columns(2)
         with c1:
             fig1 = px.bar(df, x='platform', y='revenue', color='platform', title='Revenue by Platform', template=PLOTLY_TEMPLATE)
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width='stretch', config=PLOTLY_CONFIG)
         with c2:
             fig2 = px.line(df.groupby('date')['roas'].mean().reset_index(), x='date', y='roas', title='ROAS Over Time', template=PLOTLY_TEMPLATE)
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, width='stretch', config=PLOTLY_CONFIG)
 
-    # Tab 2 - Deep Dive
     with tabs[1]:
         st.subheader(f"Deep Dive: {selected_platform}")
         c1, c2 = st.columns(2)
         fig3 = px.scatter(df, x='cpm', y='ctr', size='impressions', color='platform', title='CTR vs CPM', template=PLOTLY_TEMPLATE)
         fig4 = px.line(df.groupby('date')['cpa'].mean().reset_index(), x='date', y='cpa', title='CPA Trend', template=PLOTLY_TEMPLATE)
-        c1.plotly_chart(fig3, use_container_width=True)
-        c2.plotly_chart(fig4, use_container_width=True)
+        c1.plotly_chart(fig3, width='stretch', config=PLOTLY_CONFIG)
+        c2.plotly_chart(fig4, width='stretch', config=PLOTLY_CONFIG)
 
-    # Tab 3 - Top Campaigns
     with tabs[2]:
         st.subheader("Top Performing Campaigns")
         top = df.groupby('campaign_name').agg({'spend':'sum','revenue':'sum'}).reset_index().sort_values('revenue',ascending=False).head(10)
-        st.dataframe(top, use_container_width=True, hide_index=True)
+        st.dataframe(top, width='stretch', hide_index=True)
 
 # =============================
 # MAIN
@@ -180,7 +145,6 @@ def render_dashboard(df: pd.DataFrame, selected_platform: str):
 def main():
     with st.spinner("Loading data..."):
         df = load_campaign_data()
-
     selected_platform, selected_campaigns, date_range = render_sidebar(df)
     render_dashboard(df, selected_platform)
 
